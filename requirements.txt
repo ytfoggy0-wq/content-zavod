@@ -1,0 +1,8 @@
+apify-client
+psycopg2-binary
+groq
+python-dotenv
+numpy
+requests
+streamlit
+pandas
