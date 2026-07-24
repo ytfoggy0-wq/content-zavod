@@ -43,8 +43,14 @@ def upsert_reel(conn, account_id: int, item: dict) -> bool:
 
         if existing:
             cur.execute(
-                "update reels set views = %s, likes = %s, comments = %s where reel_url = %s",
-                (item.get("viewCount"), item.get("likeCount"), item.get("commentCount"), reel_url),
+                "update reels set views = %s, likes = %s, comments = %s, thumbnail_url = %s where reel_url = %s",
+                (
+                    item.get("viewCount"),
+                    item.get("likeCount"),
+                    item.get("commentCount"),
+                    item.get("thumbnailUrl"),
+                    reel_url,
+                ),
             )
             conn.commit()
             return False
@@ -53,8 +59,8 @@ def upsert_reel(conn, account_id: int, item: dict) -> bool:
             """
             insert into reels
                 (account_id, reel_url, shortcode, video_url, caption, posted_at,
-                 views, likes, comments, duration_seconds)
-            values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                 views, likes, comments, duration_seconds, thumbnail_url)
+            values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             """,
             (
                 account_id,
@@ -67,6 +73,7 @@ def upsert_reel(conn, account_id: int, item: dict) -> bool:
                 item.get("likeCount"),
                 item.get("commentCount"),
                 item.get("duration"),
+                item.get("thumbnailUrl"),
             ),
         )
         conn.commit()

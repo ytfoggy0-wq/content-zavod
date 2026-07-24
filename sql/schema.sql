@@ -18,6 +18,8 @@ create table reels (
     duration_seconds numeric,
     transcript text,
     median_score numeric,
+    thumbnail_url text,
+    video_description text,
     collected_at timestamptz default now()
 );
 
