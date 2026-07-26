@@ -94,5 +94,24 @@ streamlit run app.py
 
 11 из 50 запланированных конкурентов, 203 ролика — упёрлись в бесплатный
 месячный лимит Apify (`Monthly usage hard limit exceeded`). Транскрибация и превью
-собраны у всех 203 роликов. Описание видео (video_description) — у 49 из 203,
-остальное упирается в дневной лимит OpenRouter, добирается постепенно.
+собраны у всех 203 роликов. Описание видео (video_description) — у 99 из 203,
+остальное упирается в дневной лимит OpenRouter (~50/сутки), добирается постепенно
+по дням через `python describe_reels.py`.
+
+## Витрина без запуска Streamlit
+
+`streamlit run app.py` работает только на `localhost` — с других устройств
+недоступен. Для публичного доступа есть статическая версия витрины
+(`docs/vitrina.html` / `docs/index.html`), сгенерированная скриптом
+`src/build_static_vitrina.py` из тех же данных БД: карточки, превью, score,
+AI-описание, транскрибация, фильтры — без сервера, чистый HTML+JS с данными,
+встроенными в файл.
+
+Пересборка после новых данных:
+```
+cd src
+python build_static_vitrina.py
+```
+
+Деплой — GitHub Pages из `main` / папка `/docs` (Settings → Pages → Deploy from
+a branch). Публичная ссылка: `https://ytfoggy0-wq.github.io/content-zavod/`.
