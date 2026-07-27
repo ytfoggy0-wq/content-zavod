@@ -35,12 +35,15 @@ Score = 20 значит «в 20 раз больше, чем обычно наб�
 ## Как это устроено (пайплайн)
 
 ```
-Apify (сбор Reels 50 конкурентов, включая превью-картинку thumbnailUrl)
+Apify (сбор Reels конкурентов, включая превью-картинку thumbnailUrl)
    → PostgreSQL (сырые данные: просмотры, лайки, дата, ссылка, подпись, превью)
    → Groq Whisper (распознавание речи из видео → текст)
    → OpenRouter Vision (по превью-картинке → краткое описание видеоряда)
-   → PostgreSQL (дозапись транскрибации, описания, расчёт метрики)
-   → Streamlit (карточная витрина: превью, метрики, описание, фильтр по аккаунту и score)
+   → Groq (llama-3.3-70b) → AI-теги темы ролика
+   → Groq (llama-3.1-8b) → AI-идея адаптации ролика под нашу нишу
+   → PostgreSQL (дозапись транскрибации, описания, тегов, идей, расчёт score)
+   → src/export_reels.py → docs/reels_export.json
+   → src/build_static_vitrina.py → статичная HTML-витрина (docs/index.html)
 ```
 
 ## Стек и почему так
@@ -55,11 +58,16 @@ Apify (сбор Reels 50 конкурентов, включая превью-к�
 
 ## Текущее состояние
 
-11 из 50 запланированных конкурентов, 203 ролика — упёрлись в бесплатный
-месячный лимит Apify (`Monthly usage hard limit exceeded`). Транскрибация и превью
-собраны у всех 203 роликов. Описание видео (video_description) — у 99 из 203,
-остальное упирается в дневной лимит OpenRouter (~50/сутки), добирается постепенно
-по дням через `python describe_reels.py`.
+Ниша — стоматология (11 конкурентов из `config/accounts.txt`), 211 роликов.
+Транскрибация — 211/211 (3 немых ролика без звука помечены пустой транскрибацией,
+см. `nuances` в `src/transcribe_reels.py`). AI-теги темы и AI-идеи адаптации —
+211/211. Описание видео (`video_description`, OpenRouter vision) — частично,
+упирается в дневной лимит OpenRouter (~50/сутки), добирается по дням через
+`python describe_reels.py`.
+
+Apify: бесплатный лимит $5/месяц легко упирается в потолок (`Monthly usage hard
+limit exceeded`) — при новом большом сборе может понадобиться новый Apify-аккаунт
+с чистым лимитом (обновить `APIFY_TOKEN` в `.env`).
 
 ## Витрина без запуска Streamlit
 
@@ -95,7 +103,11 @@ $env:HTTP_PROXY="socks5h://127.0.0.1:10808"
 python collect_reels.py
 python transcribe_reels.py
 python describe_reels.py
+python tag_topics.py
+python generate_ideas.py
 python calc_scores.py
+python export_reels.py
+python build_static_vitrina.py
 ```
 
 Превью для роликов, собранных ДО этого обновления (у них нет `thumbnailUrl` из Apify),
@@ -113,6 +125,15 @@ vision-модель `nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free`). Бе�
 у всех. С пополнением баланса ($10+) лимит вырастает до ~1000/день.
 
 Локальный Postgres (localhost) через прокси не ходит и в нём не нуждается.
+
+`tag_topics.py` (AI-теги темы) использует Groq `llama-3.3-70b-versatile` —
+дневной лимит 100k токенов (TPD), на 211 роликов почти весь и уходит.
+`generate_ideas.py` (AI-идея адаптации) намеренно использует ДРУГУЮ модель,
+`llama-3.1-8b-instant`, — чтобы не делить одну и ту же дневную квоту с тегами.
+
+Groq-клиент в обоих скриптах создаётся с `http_client=httpx.Client(trust_env=False)` —
+без этого `httpx` подхватывает системный прокси (socks4 на этой машине) и падает
+с `Unknown scheme for proxy URL`. Любой новый скрипт с Groq должен делать так же.
 
 Веб-витрина:
 ```
