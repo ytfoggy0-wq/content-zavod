@@ -44,12 +44,19 @@ FFMPEG_FALLBACK_PATH = (
 FFMPEG_PATH = shutil.which("ffmpeg") or FFMPEG_FALLBACK_PATH
 
 
+class NoAudioStreamError(Exception):
+    pass
+
+
 def extract_audio(video_path: Path, audio_path: Path):
-    subprocess.run(
+    result = subprocess.run(
         [FFMPEG_PATH, "-y", "-i", str(video_path), "-vn", "-acodec", "mp3", str(audio_path)],
         capture_output=True,
-        check=True,
     )
+    if result.returncode != 0:
+        if b"does not contain any stream" in result.stderr:
+            raise NoAudioStreamError()
+        raise subprocess.CalledProcessError(result.returncode, result.args, result.stdout, result.stderr)
 
 
 def transcribe(groq_client: Groq, audio_path: Path) -> str:
@@ -84,7 +91,13 @@ def main():
                 audio_path = Path(tmp) / "audio.mp3"
 
                 download_video(video_url, video_path)
-                extract_audio(video_path, audio_path)
+                try:
+                    extract_audio(video_path, audio_path)
+                except NoAudioStreamError:
+                    save_transcript(conn, reel_id, "")
+                    done += 1
+                    continue
+
                 text = transcribe(groq_client, audio_path)
 
                 save_transcript(conn, reel_id, text)
