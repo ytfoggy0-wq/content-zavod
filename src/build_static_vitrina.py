@@ -215,6 +215,16 @@ TEMPLATE = """<!doctype html>
     font-size: 0.92rem;
     width: 90px;
   }
+  .control input[type="text"] {
+    background: var(--bg);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 0.45rem 0.6rem;
+    color: var(--ink);
+    font-size: 0.92rem;
+    width: 220px;
+    max-width: 100%;
+  }
   .seg {
     display: flex;
     border: 1px solid var(--line);
@@ -304,6 +314,32 @@ TEMPLATE = """<!doctype html>
     padding-bottom: 0.45rem;
   }
   label.fav-toggle input { cursor: pointer; }
+  .active-topic-row {
+    margin-top: 0.9rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.82rem;
+    color: var(--ink-dim);
+  }
+  .active-topic-row .pill {
+    font-size: 0.75rem;
+    color: var(--accent-ink);
+    background: var(--accent-gradient);
+    border-radius: 999px;
+    padding: 0.2rem 0.65rem;
+    font-weight: 600;
+  }
+  .active-topic-row button {
+    background: none;
+    border: none;
+    color: var(--ink-dim);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+    cursor: pointer;
+    font-size: 0.8rem;
+  }
+  .active-topic-row button:hover { color: var(--ink); }
   button.pagebtn {
     background: none;
     border: 1px solid var(--line);
@@ -472,6 +508,16 @@ TEMPLATE = """<!doctype html>
     background: var(--surface-2);
     border-radius: 999px;
     padding: 0.15rem 0.55rem;
+    cursor: pointer;
+    border: 1px solid transparent;
+    transition: color var(--duration-fast) var(--ease), border-color var(--duration-fast) var(--ease);
+  }
+  .card .topics .pill:hover { color: var(--ink); }
+  .card .topics .pill.active {
+    color: var(--accent-ink);
+    background: var(--accent-gradient);
+    border-color: var(--accent-line);
+    font-weight: 600;
   }
   .card .metrics { color: var(--ink-dim); font-size: 0.82rem; margin-bottom: 0.5rem; }
   .card .idea-box {
@@ -479,14 +525,40 @@ TEMPLATE = """<!doctype html>
     gap: 0.5rem;
     background: var(--accent-soft);
     border: 1px solid var(--accent-line);
-    border-radius: 8px;
+    border-radius: 8px 8px 0 0;
+    border-bottom: none;
     padding: 0.55rem 0.75rem;
     font-size: 0.83rem;
     line-height: 1.45;
-    margin-bottom: 0.6rem;
+    margin-bottom: 0;
   }
   .card .idea-box .idea-emoji { flex: none; }
   .card .idea-box .idea-text strong { color: var(--ink); }
+  .idea-actions {
+    display: flex;
+    justify-content: flex-end;
+    background: var(--accent-soft);
+    border: 1px solid var(--accent-line);
+    border-top: none;
+    border-radius: 0 0 8px 8px;
+    padding: 0 0.75rem 0.4rem;
+    margin-bottom: 0.6rem;
+  }
+  .copy-idea-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    background: none;
+    border: none;
+    color: var(--ink-dim);
+    font-size: 0.78rem;
+    cursor: pointer;
+    padding: 0;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+    transition: color var(--duration-fast) var(--ease);
+  }
+  .copy-idea-btn:hover { color: var(--ink); }
   .card .desc { font-size: 0.9rem; line-height: 1.5; margin-bottom: 0.5rem; }
   .card details.transcript { font-size: 0.82rem; color: var(--ink-dim); margin-bottom: 0.6rem; }
   .card details.transcript summary { cursor: pointer; color: var(--ink); }
@@ -581,6 +653,10 @@ TEMPLATE = """<!doctype html>
       <div class="group-label">Фильтры</div>
       <div class="group-row">
         <div class="control">
+          <span class="sublabel">Поиск</span>
+          <input type="text" id="searchInput" placeholder="по описанию, теме, транскрибации…" />
+        </div>
+        <div class="control">
           <span class="sublabel">Мин. score</span>
           <input type="number" id="minScore" step="0.1" value="0" />
         </div>
@@ -595,8 +671,13 @@ TEMPLATE = """<!doctype html>
           <span class="sublabel">&nbsp;</span>
           <label class="fav-toggle"><input type="checkbox" id="favOnly" /> ★ Только избранное</label>
         </div>
+        <div class="control">
+          <span class="sublabel">&nbsp;</span>
+          <label class="fav-toggle"><input type="checkbox" id="ideaOnly" /> 💡 Только с идеями</label>
+        </div>
         <button id="resetBtn">Сбросить фильтры</button>
       </div>
+      <div id="activeTopicRow" class="active-topic-row" style="display:none;"></div>
     </div>
   </div>
 
@@ -621,6 +702,9 @@ TEMPLATE = """<!doctype html>
   let sortMode = 'score';
   let periodMode = 'all';
   let favOnly = false;
+  let ideaOnly = false;
+  let searchQuery = '';
+  let activeTopic = null;
 
   const BOOKMARKS_KEY = 'cz_bookmarks';
   let bookmarks = new Set();
@@ -709,11 +793,16 @@ TEMPLATE = """<!doctype html>
 
   document.getElementById('resetBtn').addEventListener('click', () => {
     document.getElementById('minScore').value = 0;
+    document.getElementById('searchInput').value = '';
+    document.getElementById('ideaOnly').checked = false;
     activeAccounts = new Set(accounts);
     accountChecksEl.querySelectorAll('input').forEach(cb => cb.checked = true);
     updateAccountsSummary();
     sortMode = 'score';
     periodMode = 'all';
+    searchQuery = '';
+    ideaOnly = false;
+    activeTopic = null;
     document.querySelectorAll('#sortSeg button').forEach(b => b.classList.toggle('active', b.dataset.sort === 'score'));
     document.querySelectorAll('#periodSeg button').forEach(b => b.classList.toggle('active', b.dataset.period === 'all'));
     page = 1;
@@ -724,8 +813,44 @@ TEMPLATE = """<!doctype html>
   document.getElementById('prevBtn').addEventListener('click', () => { page -= 1; render(); });
   document.getElementById('nextBtn').addEventListener('click', () => { page += 1; render(); });
   document.getElementById('favOnly').addEventListener('change', (e) => { favOnly = e.target.checked; page = 1; render(); });
+  document.getElementById('ideaOnly').addEventListener('change', (e) => { ideaOnly = e.target.checked; page = 1; render(); });
+  let searchDebounce;
+  document.getElementById('searchInput').addEventListener('input', (e) => {
+    clearTimeout(searchDebounce);
+    searchDebounce = setTimeout(() => {
+      searchQuery = e.target.value.trim().toLowerCase();
+      page = 1;
+      render();
+    }, 150);
+  });
+
+  document.getElementById('activeTopicRow').addEventListener('click', (e) => {
+    if (e.target.closest('button')) {
+      activeTopic = null;
+      page = 1;
+      render();
+    }
+  });
 
   document.getElementById('grid').addEventListener('click', (e) => {
+    const topicPill = e.target.closest('.pill[data-topic]');
+    if (topicPill) {
+      const t = topicPill.dataset.topic;
+      activeTopic = (activeTopic === t) ? null : t;
+      page = 1;
+      render();
+      return;
+    }
+    const copyBtn = e.target.closest('.copy-idea-btn');
+    if (copyBtn) {
+      const text = copyBtn.dataset.copy;
+      navigator.clipboard.writeText(text).then(() => {
+        const original = copyBtn.innerHTML;
+        copyBtn.innerHTML = '✅ Скопировано';
+        setTimeout(() => { copyBtn.innerHTML = original; }, 1500);
+      }).catch(() => {});
+      return;
+    }
     const btn = e.target.closest('.bookmark-btn');
     if (!btn) return;
     const url = btn.dataset.url;
@@ -770,10 +895,19 @@ TEMPLATE = """<!doctype html>
       if (!activeAccounts.has(r.username)) return false;
       if ((r.median_score ?? 0) < minScore) return false;
       if (favOnly && !bookmarks.has(r.reel_url)) return false;
+      if (ideaOnly && !r.adaptation_idea) return false;
+      if (activeTopic && !(Array.isArray(r.topics) && r.topics.includes(activeTopic))) return false;
       if (periodStart) {
         if (!r.posted_at) return false;
         const posted = new Date(r.posted_at);
         if (isNaN(posted) || posted < periodStart) return false;
+      }
+      if (searchQuery) {
+        const haystack = [
+          r.video_description, r.caption, r.transcript, r.adaptation_idea,
+          Array.isArray(r.topics) ? r.topics.join(' ') : ''
+        ].filter(Boolean).join(' ').toLowerCase();
+        if (!haystack.includes(searchQuery)) return false;
       }
       return true;
     });
@@ -798,6 +932,15 @@ TEMPLATE = """<!doctype html>
     const topThreshold = scores.length ? scores[Math.floor(scores.length * 0.9)] : null;
 
     document.getElementById('count').textContent = `Роликов: ${rows.length} / ${allData.length}`;
+
+    const topicRow = document.getElementById('activeTopicRow');
+    if (activeTopic) {
+      topicRow.style.display = 'flex';
+      topicRow.innerHTML = `Тема: <span class="pill">${escapeHtml(activeTopic)}</span><button type="button">Сбросить тему ✕</button>`;
+    } else {
+      topicRow.style.display = 'none';
+      topicRow.innerHTML = '';
+    }
 
     const totalPages = Math.max(1, Math.ceil(rows.length / CARDS_PER_PAGE));
     if (page > totalPages) page = totalPages;
@@ -827,11 +970,14 @@ TEMPLATE = """<!doctype html>
         : '';
       const topicsList = Array.isArray(r.topics) ? r.topics.filter(Boolean) : [];
       const topicsBlock = topicsList.length
-        ? `<div class="topics">${topicsList.map(t => `<span class="pill">${escapeHtml(t)}</span>`).join('')}</div>`
+        ? `<div class="topics">${topicsList.map(t => `<span class="pill${t === activeTopic ? ' active' : ''}" data-topic="${escapeHtml(t)}">${escapeHtml(t)}</span>`).join('')}</div>`
         : '';
       const isBookmarked = bookmarks.has(r.reel_url);
+      const copyIdeaBtn = r.adaptation_idea
+        ? `<div class="idea-actions"><button class="copy-idea-btn" data-copy="${escapeHtml(`Идея для вас: ${r.adaptation_idea}\\n\\nПример: ${r.reel_url}`)}">📋 Скопировать идею</button></div>`
+        : '';
       const ideaBlock = r.adaptation_idea
-        ? `<div class="idea-box"><span class="idea-emoji">💡</span><span class="idea-text"><strong>Идея для нас:</strong> ${escapeHtml(r.adaptation_idea)}</span></div>`
+        ? `<div class="idea-box"><span class="idea-emoji">💡</span><span class="idea-text"><strong>Идея для вас:</strong> ${escapeHtml(r.adaptation_idea)}</span></div>${copyIdeaBtn}`
         : '';
 
       return `
