@@ -27,3 +27,11 @@ Single-context: `CONTEXT.md` + `docs/adr/` в корне (создаются л�
 - **Groq text-модели**: `tag_topics.py` и `generate_ideas.py` используют РАЗНЫЕ модели
   (`llama-3.3-70b-versatile` и `llama-3.1-8b-instant`) специально, чтобы не делить одну
   дневную квоту токенов (100k TPD легко исчерпывается на ~200 роликах).
+- **Правки UI витрины (`docs/vitrina.html`)**: GitHub Pages отдаёт публичную ссылку из
+  `docs/index.html`, а не из `vitrina.html` — это два независимых файла, оба генерируются
+  из одного `TEMPLATE` в `src/build_static_vitrina.py`. Если правишь разметку/JS витрины
+  руками (а не через пересборку из БД), после правки в `vitrina.html` синхронизируй
+  **оба**: скопируй в `docs/index.html` и обнови `TEMPLATE` в `build_static_vitrina.py`
+  (иначе публичная ссылка молча останется старой, а следующая пересборка данных откатит
+  ручные UI-правки). Проверка синхронности: `python src/build_static_vitrina.py` должен
+  выдать файл, идентичный текущему `vitrina.html`.
